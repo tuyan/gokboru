@@ -39,3 +39,35 @@ The mission logic operates in a strict, self-contained loop:
    cd gokboru
    git clone [https://github.com/mavlink/c_library_v2.git](https://github.com/mavlink/c_library_v2.git) mavlink
 
+
+## Pre-flight Checklist
+
+1. **Power & Peripherals:** Ensure the companion computer is receiving clean power and has uninterrupted camera access.
+2. **Telemetry Link:** Verify ArduPilot is routing MAVLink telemetry to UDP port `14550` on the companion computer.
+3. **GPS Lock:** Ensure the flight controller has a solid 3D GPS lock with a low HDOP before proceeding.
+4. **Airborne Initialization:** Arm the drone and take off manually (or via GCS) to a safe altitude.
+5. **Launch Engine:** Execute the `./ai_drone_tracker` binary. The drone will immediately take over velocity control and begin the transit phase to the designated coordinates.
+
+---
+
+## Safe PID Tuning Guide
+
+Every drone frame is different in weight, motor size, and aerodynamics. You **must** tune the Proportional (`Kp`), Integral (`Ki`), and Derivative (`Kd`) values in `main.cpp` for your specific hardware to prevent extreme oscillations or crashes. 
+
+> **CRITICAL SAFETY WARNING:** Never tune AI flight loops without holding the physical RC transmitter. Map a dedicated hardware switch to immediately change the flight mode to `LOITER` or `STABILIZE` to instantly sever the AI control if the drone accelerates unexpectedly.
+
+1. **Zero Out Constants:** Set `Ki = 0.0` and `Kd = 0.0`. Set `Kp` to a highly conservative baseline (e.g., `0.001`). 
+2. **Tune Proportional (Kp):** Incrementally increase `Kp` by small margins. Have a spotter move a physical target back and forth in front of the camera while the drone hovers. Keep increasing `Kp` until the drone starts overshooting the target and oscillating (wobbling).
+3. **Tune Derivative (Kd):** Leave `Kp` at the oscillating value. Slowly increase `Kd` (start around `0.005`). The derivative term predicts the error rate and applies the brakes, stopping the wobble and locking the drone onto the target smoothly.
+4. **Tune Integral (Ki):** Only add `Ki` if the drone consistently stops slightly short of the exact center pixel due to physical drag, battery sag, or wind resistance. Start extremely low (e.g., `0.0001`), as too much integral gain will cause slow, wide, and dangerous looping orbits.
+
+## Usage
+
+Gökbörü requires three arguments to initiate a mission: Target Latitude, Target Longitude, and the file path to the reference image it needs to search for. 
+
+> **Note:** The reference image should be a clear, well-lit, and tightly cropped picture of the specific object you want the drone to track.
+
+```bash
+# Syntax
+./ai_drone_tracker <Target_Lat> <Target_Lon> <Reference_Image_Path>
+
